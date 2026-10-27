@@ -11,7 +11,9 @@ export const CITIES: City[] = [
   { id: "valencia", nombre: "Valencia", latitud: 39.4699, longitud: -0.3763 },
 ]
 
-type Hourly = { time?: unknown; temperature_2m?: unknown; relative_humidity_2m?: unknown; precipitation?: unknown }
+const METRIC_NAMES = ["temperatura_c", "humedad_pct", "precipitacion_mm"]
+
+type Hourly ={ time?: unknown; temperature_2m?: unknown; relative_humidity_2m?: unknown; precipitation?: unknown }
 
 export function transformWeather(ciudad: string, payload: unknown): PipelineResult {
   const hourly = (payload as { hourly?: Hourly })?.hourly
@@ -28,7 +30,9 @@ export function transformWeather(ciudad: string, payload: unknown): PipelineResu
   for (let i = 0; i < input; i++) {
     const fecha = typeof times[i] === "string" ? new Date(`${times[i]}Z`) : new Date("")
     const metrics = [temperatures[i], humidities[i], precipitation[i]]
-    let reason = !ciudad ? "Ciudad ausente" : Number.isNaN(fecha.getTime()) ? "Fecha UTC inválida" : !metrics.every((n) => typeof n === "number" && Number.isFinite(n)) ? "Medición ausente o no numérica" : ""
+    // Un null es una medición ausente: se rechaza y se documenta, nunca se sustituye por 0.
+    const nulls = METRIC_NAMES.filter((_, k) => metrics[k] === null || metrics[k] === undefined)
+    let reason = !ciudad ? "Ciudad ausente" : Number.isNaN(fecha.getTime()) ? "Fecha UTC inválida" : nulls.length ? `Valor null en ${nulls.join(", ")} (no se convierte a 0)` : !metrics.every((n) => typeof n === "number" && Number.isFinite(n)) ? "Medición no numérica" : ""
     if (!reason && (humidities[i] as number < 0 || humidities[i] as number > 100)) reason = "Humedad fuera de 0–100 %"
     if (!reason && (precipitation[i] as number < 0)) reason = "Precipitación negativa"
     const key = `${ciudad}|${fecha.toISOString()}`
