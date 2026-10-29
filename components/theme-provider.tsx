@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Moon, Sun } from "lucide-react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 
 function ThemeProvider({
@@ -15,57 +16,31 @@ function ThemeProvider({
       disableTransitionOnChange
       {...props}
     >
-      <ThemeHotkey />
       {children}
     </NextThemesProvider>
   )
 }
 
-function isTypingTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
+const noop = () => () => {}
 
+/** Botón sol/luna para cambiar entre modo claro y modo noche. */
+function ThemeToggle({ className = "" }: { className?: string }) {
+  const { resolvedTheme, setTheme } = useTheme()
+  // El tema solo se conoce en el navegador: hasta entonces se pinta un hueco del mismo tamaño.
+  const mounted = React.useSyncExternalStore(noop, () => true, () => false)
+  const dark = resolvedTheme === "dark"
+  if (!mounted) return <span className={`theme-toggle ${className}`} aria-hidden />
   return (
-    target.isContentEditable ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
+    <button
+      type="button"
+      className={`theme-toggle ${className}`}
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      aria-label={dark ? "Cambiar a modo claro" : "Cambiar a modo noche"}
+      title={dark ? "Modo claro" : "Modo noche"}
+    >
+      {dark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+    </button>
   )
 }
 
-function ThemeHotkey() {
-  const { resolvedTheme, setTheme } = useTheme()
-
-  React.useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.repeat) {
-        return
-      }
-
-      if (event.metaKey || event.ctrlKey || event.altKey) {
-        return
-      }
-
-      if (event.key.toLowerCase() !== "d") {
-        return
-      }
-
-      if (isTypingTarget(event.target)) {
-        return
-      }
-
-      setTheme(resolvedTheme === "dark" ? "light" : "dark")
-    }
-
-    window.addEventListener("keydown", onKeyDown)
-
-    return () => {
-      window.removeEventListener("keydown", onKeyDown)
-    }
-  }, [resolvedTheme, setTheme])
-
-  return null
-}
-
-export { ThemeProvider }
+export { ThemeProvider, ThemeToggle }

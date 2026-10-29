@@ -44,8 +44,16 @@ export async function GET(request: Request) {
   } catch (e) { return Response.json({ error: errorMessage(e) }, { status: 503 }) }
 }
 
+// 500 registros ocupan ~70 KB en JSON: 256 KB da margen y corta peticiones abusivas antes de parsearlas.
+const MAX_BODY_BYTES = 256 * 1024
+
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as { records?: unknown } | null
+  const declared = Number(request.headers.get("content-length") ?? 0)
+  if (declared > MAX_BODY_BYTES) return Response.json({ error: "Petición demasiado grande." }, { status: 413 })
+  const text = await request.text()
+  if (text.length > MAX_BODY_BYTES) return Response.json({ error: "Petición demasiado grande." }, { status: 413 })
+  let body: { records?: unknown } | null = null
+  try { body = JSON.parse(text) } catch { /* cuerpo no JSON: se rechaza abajo */ }
   if (!Array.isArray(body?.records) || body.records.length < 1 || body.records.length > 500 || !body.records.every(isRecord)) return Response.json({ error: "Lote inválido: se admiten hasta 500 registros válidos." }, { status: 400 })
   const records = body.records as WeatherRecord[]
   try {
